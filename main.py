@@ -45,6 +45,7 @@ if __name__ == "__main__":
         log_dir=FLAGS.results_dir,
         model_dir=FLAGS.results_dir,
         data_dir=FLAGS.data_dir,
+        pre_trained_model_path=FLAGS.pre_trained_model_path,
 
         # ======= Optimization HParams ======== #
         use_xla=FLAGS.use_xla,

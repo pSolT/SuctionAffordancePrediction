@@ -65,13 +65,11 @@ def get_dataset_files(data_dir, dataset_name, split):
 
 def read_image(path):
     file =  tf.read_file(path)
-    print(file)
     return file
 
 def preprocess_color_image(image):
     image = tf.image.decode_png(image, channels=3, dtype=tf.dtypes.uint8)
     image = tf.cast(image, tf.dtypes.float32)
-    print(image.get_shape())
     means_per_channel = tf.reshape(_CHANNEL_MEANS, [1, 1, _NUM_CHANNELS])
     means_per_channel = tf.cast(means_per_channel, dtype=image.dtype)
 
@@ -87,7 +85,6 @@ def preprocess_color_image(image):
 def preprocess_depth_image(image):
     image = tf.image.decode_png(image, channels=1, dtype=tf.dtypes.uint8)
     image = tf.cast(image, tf.dtypes.float32)
-    print(image.get_shape())
     image = tf.multiply(image, 65536/10000)
     image = tf.clip_by_value(image, 0.0, 1.2)
     
@@ -98,7 +95,6 @@ def preprocess_depth_image(image):
     
     depth_image = tf.subtract(depth_image, means_per_channel)
     depth_image = tf.divide(depth_image, stds_per_channel)
-    print(depth_image.get_shape())
     return depth_image
 
     

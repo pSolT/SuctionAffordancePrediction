@@ -37,7 +37,7 @@ __all__ = [
 
 class Runner(object):
 
-    def __init__(self, n_classes, height, width, model_dir, log_dir, data_dir, use_xla=False,  use_tf_amp=False, seed=None ):
+    def __init__(self, n_classes, height, width, model_dir, log_dir, data_dir, pre_trained_model_path, use_xla=False,  use_tf_amp=False, seed=None ):
 
 
         if data_dir is not None and not os.path.exists(data_dir):
@@ -79,6 +79,7 @@ class Runner(object):
             model_dir=model_dir if hvd.rank() == 0 else None,
             log_dir=log_dir if hvd.rank() == 0 else None,
             data_dir=data_dir,
+            pre_trained_model_path=pre_trained_model_path,
             num_preprocessing_threads=32,
         )
 
@@ -86,7 +87,7 @@ class Runner(object):
 
 
         self._model = fcn.FCN(
-            pre_trained_model_path=run_config_additional.model_dir,
+            pre_trained_model_path=run_config_additional.pre_trained_model_path,
             num_classes=model_hparams.n_classes
         )
 

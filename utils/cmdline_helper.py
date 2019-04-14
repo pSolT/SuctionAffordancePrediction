@@ -93,6 +93,13 @@ def parse_cmdline():
         required=True,
         help="""Directory in which to write training logs, summaries and checkpoints."""
     )
+    
+    p.add_argument(
+        '--pre_trained_model_path',
+        type=str,
+        required=True,
+        help="""Path to pre-trained ResNet-v1-101"""
+    )
 
     p.add_argument(
         '--display_every', 
