@@ -262,6 +262,7 @@ class Runner(object):
             LOGGER.log("Num GPUs", num_gpus)
             LOGGER.log("Per-GPU Batch Size", batch_size)
 
+            '''
             
             if is_benchmark:
 
@@ -286,7 +287,8 @@ class Runner(object):
                 )
 
                 training_hooks.append(training_logging_hook)
-
+            '''
+            
         bcast_hook = hvd.BroadcastGlobalVariablesHook(0)
         training_hooks.append(bcast_hook)
 

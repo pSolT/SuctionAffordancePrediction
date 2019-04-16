@@ -8,7 +8,6 @@ import horovod.tensorflow as hvd
 
 __all__ = ["get_input_fn", "get_num_images"]
 
-
 #local mean = {0.485,0.456,0.406}
 #local std = {0.229,0.224,0.225}
 #Each calculated * 256
@@ -78,7 +77,7 @@ def preprocess_color_image(image):
     
     image = tf.subtract(image, means_per_channel)
     image = tf.divide(image, stds_per_channel)
-    print(image.get_shape())
+
     return image
 
 
@@ -88,8 +87,9 @@ def preprocess_depth_image(image):
     image = tf.multiply(image, 65536/10000)
     image = tf.clip_by_value(image, 0.0, 1.2)
     
-    depth_image = tf.concat([image, image, image], 1)
-    
+
+    depth_image = tf.concat([image, image, image], 2)
+
     means_per_channel = tf.reshape(_CHANNEL_MEANS, [1, 1, _NUM_CHANNELS])
     stds_per_channel = tf.reshape(_CHANNEL_STDS, [1, 1, _NUM_CHANNELS])
     
@@ -109,7 +109,7 @@ def preprocess_label_image(image):
     
 
 def get_input_fn(data_dir, batch_size, mode='train'):
-    shuffle_buffer_size = 1000
+    shuffle_buffer_size = 10
     
     train_split, test_split = get_splits(data_dir)
     training = False
@@ -127,10 +127,6 @@ def get_input_fn(data_dir, batch_size, mode='train'):
     color_input_files = get_dataset_files(data_dir, 'color-input', split)
     depth_input_files = get_dataset_files(data_dir, 'depth-input', split)
     label_files = get_dataset_files(data_dir, 'label', split)
-    
-    #color_input_files = tf.constant(color_input_files)
-    #depth_input_files = tf.constant(depth_input_files)
-    #label_files = tf.constant(label_files)
 
     dataset =  tf.data.Dataset.from_tensor_slices((color_input_files, depth_input_files, label_files))
     def load_and_preprocess_from_paths(color_input_file_path, depth_input_file_path, label_file_path):
@@ -145,29 +141,6 @@ def get_input_fn(data_dir, batch_size, mode='train'):
 
     dataset = dataset.batch(batch_size=batch_size, drop_remainder=True)
     
-    '''
-    
-    color_input_dataset = tf.data.Dataset.from_tensor_slices(color_input_files)
-    depth_input_dataset = tf.data.Dataset.from_tensor_slices(depth_input_files)
-    label_dataset = tf.data.Dataset.from_tensor_slices(label_files)
-    
-    print(color_input_dataset)
-    print(depth_input_dataset)
-    print(label_dataset)
-    
-    image_ds = color_input_dataset.map(preprocess_color_image, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-    depth_ds = depth_input_dataset.map(preprocess_depth_image, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-    label_ds = depth_input_dataset.map(preprocess_label_image, num_parallel_calls=tf.data.experimental.AUTOTUNE)
-    
-    dataset = tf.data.Dataset.zip(((image_ds, depth_ds), label_ds))
-    
-    if training:
-        dataset = dataset.apply(tf.data.experimental.shuffle_and_repeat(buffer_size=shuffle_buffer_size))
-    else:
-        dataset = dataset.repeat()
-
-    dataset = dataset.batch(batch_size=batch_size, drop_remainder=True)
-'''
     return dataset
     
     
