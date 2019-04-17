@@ -1,6 +1,6 @@
-FROM nvcr.io/nvidia/tensorflow:19.03-py3
+FROM nvcr.io/nvidia/tensorflow:19.04-py3
 ## MAINTAINER Paweł Sołtysiak <psoltysiak@nvidia.com>
 
-ADD . /workspace/rn50v15_tf
-WORKDIR /workspace/rn50v15_tf
+ADD . /workspace/suction_affordance_prediction
+WORKDIR /workspace/suction_affordance_prediction
 RUN pip install -r requirements.txt
