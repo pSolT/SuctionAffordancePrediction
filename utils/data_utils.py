@@ -11,14 +11,14 @@ __all__ = ["get_input_fn", "get_num_images"]
 #local mean = {0.485,0.456,0.406}
 #local std = {0.229,0.224,0.225}
 #Each calculated * 256
-_R_MEAN = 124.16
-_G_MEAN = 116.73
-_B_MEAN = 103.94
+_R_MEAN = 0.485
+_G_MEAN = 0.456
+_B_MEAN = 0.406
 _CHANNEL_MEANS = [_R_MEAN, _G_MEAN, _B_MEAN]
 
-_R_STD = 58.62
-_G_STD = 57.344
-_B_STD = 57.6
+_R_STD = 0.229
+_G_STD = 0.224
+_B_STD = 0.225
 _CHANNEL_STDS = [_R_STD, _G_STD, _B_STD]
 
 _NUM_CHANNELS = 3
@@ -69,6 +69,9 @@ def read_image(path):
 def preprocess_color_image(image):
     image = tf.image.decode_png(image, channels=3, dtype=tf.dtypes.uint8)
     image = tf.cast(image, tf.dtypes.float32)
+    
+    image = tf.divide(image, 256.0)
+    
     means_per_channel = tf.reshape(_CHANNEL_MEANS, [1, 1, _NUM_CHANNELS])
     means_per_channel = tf.cast(means_per_channel, dtype=image.dtype)
 
@@ -78,37 +81,52 @@ def preprocess_color_image(image):
     image = tf.subtract(image, means_per_channel)
     image = tf.divide(image, stds_per_channel)
 
+                        
     return image
 
 
 def preprocess_depth_image(image):
     image = tf.image.decode_png(image, channels=1, dtype=tf.dtypes.uint8)
     image = tf.cast(image, tf.dtypes.float32)
+    
+    image = tf.divide(image, 256.0)
     image = tf.multiply(image, 65536/10000)
     image = tf.clip_by_value(image, 0.0, 1.2)
     
-
-    depth_image = tf.concat([image, image, image], 2)
-
+    image = tf.concat([image, image, image], 2)
+    
     means_per_channel = tf.reshape(_CHANNEL_MEANS, [1, 1, _NUM_CHANNELS])
+    means_per_channel = tf.cast(means_per_channel, dtype=image.dtype)
+
     stds_per_channel = tf.reshape(_CHANNEL_STDS, [1, 1, _NUM_CHANNELS])
+    stds_per_channel = tf.cast(means_per_channel, dtype=image.dtype)
     
-    depth_image = tf.subtract(depth_image, means_per_channel)
-    depth_image = tf.divide(depth_image, stds_per_channel)
-    return depth_image
+    image = tf.subtract(image, means_per_channel)
+    image = tf.divide(image, stds_per_channel)
+    
+    return image
 
     
-def preprocess_label_image(image):
+def preprocess_label_image(image, scale):
     image = tf.image.decode_png(image, channels=3, dtype=tf.dtypes.uint8)
     image = tf.cast(image, tf.dtypes.float32)
+    
+    image = tf.divide(image, 256.0)
+    
+    height = tf.shape(image)[0]
+    width = tf.shape(image)[1]
+    
+    image = tf.image.resize(image, [height / scale, width / scale])
+    
     image = tf.multiply(image, 2.0)
     image = tf.round(image)
     image = tf.add(image, 1.0)
     
+    
     return image
     
 
-def get_input_fn(data_dir, batch_size, mode='train'):
+def get_input_fn(data_dir, batch_size, label_output_scale, mode='train'):
     shuffle_buffer_size = 10
     
     train_split, test_split = get_splits(data_dir)
@@ -130,7 +148,7 @@ def get_input_fn(data_dir, batch_size, mode='train'):
 
     dataset =  tf.data.Dataset.from_tensor_slices((color_input_files, depth_input_files, label_files))
     def load_and_preprocess_from_paths(color_input_file_path, depth_input_file_path, label_file_path):
-        return (preprocess_color_image(read_image(color_input_file_path)), preprocess_depth_image(read_image(color_input_file_path))),  preprocess_label_image(read_image(color_input_file_path))
+        return (preprocess_color_image(read_image(color_input_file_path)), preprocess_depth_image(read_image(depth_input_file_path))),  preprocess_label_image(read_image(label_file_path),label_output_scale)
             
     dataset = dataset.map(load_and_preprocess_from_paths, num_parallel_calls=tf.data.experimental.AUTOTUNE)
     
