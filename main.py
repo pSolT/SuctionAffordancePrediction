@@ -46,7 +46,8 @@ if __name__ == "__main__":
         model_dir=FLAGS.results_dir,
         data_dir=FLAGS.data_dir,
         pre_trained_model_path=FLAGS.pre_trained_model_path,
-
+        use_transpose_conv=FLAGS.use_transpose_conv,
+        
         # ======= Optimization HParams ======== #
         use_xla=FLAGS.use_xla,
         use_tf_amp=FLAGS.use_tf_amp,

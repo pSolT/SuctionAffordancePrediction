@@ -37,7 +37,7 @@ __all__ = [
 
 class Runner(object):
 
-    def __init__(self, n_classes, height, width, model_dir, log_dir, data_dir, pre_trained_model_path, use_xla=False,  use_tf_amp=False, seed=None ):
+    def __init__(self, n_classes, height, width, model_dir, log_dir, data_dir, pre_trained_model_path, use_transpose_conv, use_xla=False,  use_tf_amp=False, seed=None ):
 
 
         if data_dir is not None and not os.path.exists(data_dir):
@@ -52,7 +52,6 @@ class Runner(object):
 
         os.environ['HOROVOD_GPU_ALLREDUCE'] = 'NCCL'
 
-        #os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
         os.environ['TF_GPU_THREAD_MODE'] = 'gpu_private'
         os.environ['TF_GPU_THREAD_COUNT'] = str(hvd.size())
@@ -62,11 +61,18 @@ class Runner(object):
                 LOGGER.log("TF AMP is activated - Experimental Feature")
             os.environ["TF_ENABLE_AUTO_MIXED_PRECISION_GRAPH_REWRITE"] = "1"
 
+        if use_tf_amp:
+            if hvd.rank() == 0:
+                LOGGER.log("Using transpose convolutions-based approach")
+            
         model_hparams = tf.contrib.training.HParams(
             width=height,
             height=width,
             n_classes=n_classes,
             seed=tf_seed,
+            use_transpose_conv=use_transpose_conv,
+            label_output_scale = 1 if use_transpose_conv else 8,
+            upscale_ratio = 1 if use_transpose_conv else 4
         )
 
         run_config_performance = tf.contrib.training.HParams(
@@ -88,7 +94,9 @@ class Runner(object):
 
         self._model = fcn.FCN(
             pre_trained_model_path=run_config_additional.pre_trained_model_path,
-            num_classes=model_hparams.n_classes
+            num_classes=model_hparams.n_classes,
+            use_transpose_conv=model_hparams.use_transpose_conv,
+            upscale_ratio=model_hparams.upscale_ratio
         )
 
         if self.run_hparams.seed is not None:
@@ -262,32 +270,13 @@ class Runner(object):
             LOGGER.log("Num GPUs", num_gpus)
             LOGGER.log("Per-GPU Batch Size", batch_size)
 
-            '''
-            
-            if is_benchmark:
+            training_logging_hook = hooks.TrainingLoggingHook(
+                global_batch_size=global_batch_size,
+                log_every=1
+            )
 
-                benchmark_logging_hook = hooks.BenchmarkLoggingHook(
-                    log_file_path=os.path.join(self.run_hparams.log_dir, "training_benchmark.json"),
-                    global_batch_size=global_batch_size,
-                    log_every=log_every_n_steps,
-                    warmup_steps=warmup_steps
-                )
+            training_hooks.append(training_logging_hook)
 
-                training_hooks.append(benchmark_logging_hook)
-
-            else:
-
-                training_logging_hook = hooks.TrainingLoggingHook(
-                    log_file_path=os.path.join(self.run_hparams.log_dir, "training.json"),
-                    global_batch_size=global_batch_size,
-                    num_steps=num_steps,
-                    num_samples=num_samples,
-                    num_epochs=num_epochs,
-                    log_every=log_every_n_steps
-                )
-
-                training_hooks.append(training_logging_hook)
-            '''
             
         bcast_hook = hvd.BroadcastGlobalVariablesHook(0)
         training_hooks.append(bcast_hook)
@@ -295,13 +284,9 @@ class Runner(object):
       
         estimator_params = {
             'batch_size': batch_size,
-            'steps_per_epoch': steps_per_epoch,
             'num_gpus': num_gpus,
             'momentum': momentum,
-            'learning_rate_init': learning_rate_init,
-            'weight_decay': weight_decay,
-            'loss_scale': loss_scale,
-            'apply_loss_scaling': not use_auto_loss_scaling
+            'learning_rate_init': learning_rate_init
         }
 
         image_classifier = self._get_estimator(
@@ -314,7 +299,8 @@ class Runner(object):
             return data_utils.get_input_fn(
                 data_dir=self.run_hparams.data_dir,
                 mode='train',
-                batch_size=batch_size
+                batch_size=batch_size,
+                label_output_scale=self.run_hparams.label_output_scale
             )
 
         try:
@@ -386,7 +372,8 @@ class Runner(object):
             return data_utils.get_input_fn(
                 data_dir=self.data_dir,
                 mode='test',
-                batch_size=batch_size
+                batch_size=batch_size,
+                label_output_scale=self.run_hparams.label_output_scale
             )
      
         try:

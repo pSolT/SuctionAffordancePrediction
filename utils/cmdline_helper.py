@@ -36,7 +36,7 @@ def parse_cmdline():
         required=False,
         default=None,
         type=str,
-        help="Path to dataset in TFRecord format. Files should be named 'train-*' and 'validation-*'."
+        help="Path to dataset."
     )
     
     p.add_argument(
@@ -111,7 +111,7 @@ def parse_cmdline():
 
     p.add_argument(
         '--lr_init',
-        default=0.001,
+        default=10e-7,
         type=float,
         required=False,
         help="""Initial value for the learning rate."""
@@ -127,10 +127,17 @@ def parse_cmdline():
 
     p.add_argument(
         '--momentum',
-        default=0.9,
+        default=0.99,
         type=float,
         required=False,
         help="""SGD momentum value for the Momentum optimizer."""
+    )
+    
+    p.add_argument(
+        "--use_transpose_conv",
+        action='store_true',
+        required=False,
+        help="Use transpose convolutions based approach"
     )
     
     p.add_argument(
@@ -157,7 +164,7 @@ def parse_cmdline():
     p.add_argument(
         '--seed', 
         type=int, 
-        default=1, 
+        required=False,
         help="""Random seed."""
     )
 
