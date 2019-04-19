@@ -286,7 +286,8 @@ class Runner(object):
             'batch_size': batch_size,
             'num_gpus': num_gpus,
             'momentum': momentum,
-            'learning_rate_init': learning_rate_init
+            'learning_rate_init': learning_rate_init,
+            'log_dir' : self.run_hparams.log_dir
         }
 
         image_classifier = self._get_estimator(
@@ -328,7 +329,9 @@ class Runner(object):
         if iter_unit not in ["epoch", "batch"]:
             raise ValueError('`iter_unit` value is unknown: %s (allowed: ["epoch", "batch"])' % iter_unit)
 
-        estimator_params = {}
+        estimator_params = {
+            'log_dir' : self.run_hparams.log_dir
+        }
             
         image_classifier = self._get_estimator(
             mode='validation',
@@ -336,7 +339,7 @@ class Runner(object):
             use_xla=self.run_hparams.use_xla,
         )
         
-        num_images = data_utils.get_num_images(self.data_dir, mode="test")
+        num_images = data_utils.get_num_images(self.run_hparams.data_dir, mode="test")
         
         if iter_unit == 'epoch':
             num_steps = (num_samples // global_batch_size) * num_iter
@@ -345,8 +348,8 @@ class Runner(object):
 
         else:
             num_steps = num_iter
-            num_epochs = math.ceil(num_steps / (num_images // global_batch_size))
-            num_decay_steps = 90 * num_images // global_batch_size
+            num_epochs = math.ceil(num_steps / (num_images // batch_size))
+            num_decay_steps = 90 * num_images // batch_size
         
         eval_hooks = []
         
@@ -370,7 +373,7 @@ class Runner(object):
             
         def evaluation_data_fn():      
             return data_utils.get_input_fn(
-                data_dir=self.data_dir,
+                data_dir=self.run_hparams.data_dir,
                 mode='test',
                 batch_size=batch_size,
                 label_output_scale=self.run_hparams.label_output_scale

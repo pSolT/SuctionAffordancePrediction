@@ -80,8 +80,7 @@ def preprocess_color_image(image):
     
     image = tf.subtract(image, means_per_channel)
     image = tf.divide(image, stds_per_channel)
-
-                        
+                            
     return image
 
 
@@ -92,7 +91,7 @@ def preprocess_depth_image(image):
     image = tf.divide(image, 256.0)
     image = tf.multiply(image, 65536/10000)
     image = tf.clip_by_value(image, 0.0, 1.2)
-    
+   
     image = tf.concat([image, image, image], 2)
     
     means_per_channel = tf.reshape(_CHANNEL_MEANS, [1, 1, _NUM_CHANNELS])
@@ -103,26 +102,27 @@ def preprocess_depth_image(image):
     
     image = tf.subtract(image, means_per_channel)
     image = tf.divide(image, stds_per_channel)
-    
+
     return image
 
     
 def preprocess_label_image(image, scale):
     image = tf.image.decode_png(image, channels=3, dtype=tf.dtypes.uint8)
+    image = tf.image.rgb_to_grayscale(image)
     image = tf.cast(image, tf.dtypes.float32)
-    
-    image = tf.divide(image, 256.0)
     
     height = tf.shape(image)[0]
     width = tf.shape(image)[1]
     
     image = tf.image.resize(image, [height / scale, width / scale])
     
-    image = tf.multiply(image, 2.0)
+    # Convert images to have values from range [0-2]
+    image = tf.divide(image, 127.5)
     image = tf.round(image)
-    image = tf.add(image, 1.0)
     
-    
+    # Re-cast to uint8 for further one-hotting
+    image = tf.cast(image, tf.dtypes.uint8)
+
     return image
     
 

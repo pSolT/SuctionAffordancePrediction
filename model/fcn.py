@@ -63,14 +63,16 @@ class FCN(object):
 
                     tf.train.init_from_checkpoint(self.pre_trained_model_path, depth_assignment_map)
 
-            rgb_branch_output = rgb_end_points['pre_fully_connected']
-            depth_branch_output = depth_end_points['pre_fully_connected']
+            rgb_branch_output = rgb_end_points['pre_fully_connected']           
+            rgb_logits = tf.contrib.slim.conv2d(rgb_branch_output, 3, [1, 1], padding='SAME')
+            
+            depth_branch_output = depth_end_points['pre_fully_connected']        
+            depth_logits = tf.contrib.slim.conv2d(depth_branch_output, 3, [1, 1], padding='SAME')
 
             model = tf.concat( [rgb_branch_output, depth_branch_output], axis=3, name='branches_concat')
 
             # Use standard convolutiomns and upscale with bilinear resize
             if self.upscale_ratio and not self.use_transpose_conv:
-
                 model = tf.contrib.slim.conv2d(model, 512, [1, 1], padding='SAME')
                 model = tf.contrib.slim.conv2d(model, 128, [1, 1], padding='SAME')
                 model = tf.contrib.slim.conv2d(model, 3, [1, 1], padding='SAME')
@@ -82,7 +84,6 @@ class FCN(object):
 
             # Use transpose convolutions to upscale to full label size
             else:
-
                 model = tf.contrib.slim.conv2d_transpose(model, 512, (3, 3), stride=4, padding='SAME', activation_fn=None)
                 model = tf.contrib.slim.conv2d_transpose(model, 128, (4, 4), stride=4, padding='SAME', activation_fn=None)
                 model = tf.contrib.slim.conv2d_transpose(model, 3, (4, 4), stride=2, padding='SAME', activation_fn=None)
@@ -91,22 +92,31 @@ class FCN(object):
             
             # Calculate probabilities and predictions
             probs = tf.contrib.slim.softmax(logits)
-            y_preds = tf.argmax(logits, axis=3, output_type=tf.int32)
 
             predictions = {
-                'classes': y_preds,
+                'classes': logits,
                 'probabilities': probs,
             }
-                      
-            #Flatten logits and labels to calculate loss
-            logits_flat = tf.reshape(logits, [-1])  
+            
+            tf.summary.image("rgb_input", features[0])
+            tf.summary.image("depth_input", features[1])
+            tf.summary.image("logits", logits)
+            tf.summary.image("labels", labels)
+            summaries = tf.summary.merge_all()
+
+            #acc_map, acc_map_update_op = tf.metrics.average_precision_at_k(labels, logits, k=3)
+                     
+            # Flatten logits and labels to calculate loss
+            logits_flat = tf.reshape(logits, [-1, 3])  
             labels_flat = tf.reshape(labels, [-1])
 
             logits_flat = tf.identity(logits_flat, name='logits_flat_ref')
             labels_flat = tf.identity(labels_flat, name='labels_flat_ref')
-
             
-            loss = tf.nn.softmax_cross_entropy_with_logits_v2(logits=logits_flat, labels=labels_flat)
+            # Transform labels to one-hot encoding
+            labels_flat = tf.one_hot(labels_flat, depth=3, dtype=tf.float32)
+            
+            loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(logits=logits_flat, labels=labels_flat))
             loss = tf.identity(loss, name='cross_entropy_loss_ref')
 
             
@@ -118,7 +128,7 @@ class FCN(object):
                     global_step = tf.train.get_or_create_global_step())
 
                 logging_hook = tf.train.LoggingTensorHook({"loss" : loss} , every_n_iter=1)
-     
+                
                 return tf.estimator.EstimatorSpec(
                     mode=mode,
                     loss=loss,
@@ -127,9 +137,9 @@ class FCN(object):
     
             elif mode == tf.estimator.ModeKeys.EVAL:
                 
-                eval_metrics = {
-                    # TODOD
-                }
+                eval_metrics = {}
+                    #"mAP": (acc_map, acc_map_update_op )
+                #}
    
                 return tf.estimator.EstimatorSpec(
                     mode=mode,
