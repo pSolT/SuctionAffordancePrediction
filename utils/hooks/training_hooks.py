@@ -29,7 +29,8 @@ class TrainingLoggingHook(tf.train.SessionRunHook):
                 'labels_flat_ref:0',
                 'rgb_inputs:0',
                 'depth_inputs:0',
-                'labels:0'
+                'labels_flat_ref:0',
+                'logits_flat_ref:0',
             ]
         )
         '''
@@ -39,12 +40,13 @@ class TrainingLoggingHook(tf.train.SessionRunHook):
                 'cross_entropy_loss_ref:0',
             ]
         )
+
         self.t0 = time.time()
         return run_args
 
     def after_run(self, run_context, run_values):
         
-        #global_step, cross_entropy, logits_flat, labels_flat, rgb_inputs, depth_inputs, labels = run_values.results
+        #global_step, cross_entropy, logits_flat, labels_flat, rgb_inputs, depth_inputs, labels, logits = run_values.results
         global_step, cross_entropy = run_values.results
         batch_time = time.time() - self.t0
         ips = self.global_batch_size / batch_time
@@ -52,6 +54,7 @@ class TrainingLoggingHook(tf.train.SessionRunHook):
         
         #print("RGB Inputs: Mean", np.mean(rgb_inputs), " std: ", np.std(rgb_inputs), "min", np.min(rgb_inputs), "max", np.max(rgb_inputs))
         #print("Depth Inputs: Mean", np.mean(depth_inputs), " std: ", np.std(depth_inputs), "min", np.min(depth_inputs), "max", np.max(depth_inputs))
+        #print("Logits: Mean", np.mean(logits), " std: ", np.std(logits), "min", np.min(logits), "max", np.max(logits))        
         #print("Labels: Mean", np.mean(labels), " std: ", np.std(labels), "min", np.min(labels), "max", np.max(labels))
         #for i in range(len(logits_flat)):
             #print(logits_flat[i], labels_flat[i])

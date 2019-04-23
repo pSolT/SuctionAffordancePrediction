@@ -110,7 +110,7 @@ def preprocess_label_image(image, scale):
     image = tf.image.decode_png(image, channels=3, dtype=tf.dtypes.uint8)
     image = tf.image.rgb_to_grayscale(image)
     image = tf.cast(image, tf.dtypes.float32)
-    
+
     height = tf.shape(image)[0]
     width = tf.shape(image)[1]
     
@@ -124,7 +124,10 @@ def preprocess_label_image(image, scale):
     image = tf.cast(image, tf.dtypes.uint8)
 
     return image
-    
+
+def decode_label_image(image):
+    image = tf.image.decode_png(image, channels=3, dtype=tf.dtypes.uint8)
+    return image
 
 def get_input_fn(data_dir, batch_size, label_output_scale, mode='train'):
     shuffle_buffer_size = 10
@@ -148,7 +151,8 @@ def get_input_fn(data_dir, batch_size, label_output_scale, mode='train'):
 
     dataset =  tf.data.Dataset.from_tensor_slices((color_input_files, depth_input_files, label_files))
     def load_and_preprocess_from_paths(color_input_file_path, depth_input_file_path, label_file_path):
-        return (preprocess_color_image(read_image(color_input_file_path)), preprocess_depth_image(read_image(depth_input_file_path))),  preprocess_label_image(read_image(label_file_path),label_output_scale)
+        return (preprocess_color_image(read_image(color_input_file_path)), preprocess_depth_image(read_image(depth_input_file_path)),  
+    decode_label_image(read_image(label_file_path))), preprocess_label_image(read_image(label_file_path),label_output_scale)
             
     dataset = dataset.map(load_and_preprocess_from_paths, num_parallel_calls=tf.data.experimental.AUTOTUNE)
     

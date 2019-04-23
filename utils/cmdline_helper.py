@@ -86,6 +86,13 @@ def parse_cmdline():
         help="""Number of steps considered as warmup and not taken into account for performance measurements."""
     )
     
+    p.add_argument(
+        '--eval_every',
+        default=1,
+        type=int,
+        required=False,
+        help="""Eval every n iterations"""
+    )
 
     p.add_argument(
         '--results_dir',

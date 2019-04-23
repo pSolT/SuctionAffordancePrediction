@@ -342,7 +342,7 @@ class Runner(object):
         num_images = data_utils.get_num_images(self.run_hparams.data_dir, mode="test")
         
         if iter_unit == 'epoch':
-            num_steps = (num_samples // global_batch_size) * num_iter
+            num_steps = (num_images // batch_size) * num_iter
             num_epochs = num_iter
             num_decay_steps = num_steps
 
@@ -386,8 +386,13 @@ class Runner(object):
                 hooks=eval_hooks,
             )
             
-            LOGGER.log('Top-1 Accuracy: %.3f' % float(eval_results['top1_accuracy'] * 100))
-            LOGGER.log('Top-5 Accuracy: %.3f' % float(eval_results['top5_accuracy'] * 100))
+            print(eval_results)
+            
+            tp = np.mean(eval_results['true_positives'])
+            fp = np.mean(eval_results['false_positives'])
+            precision = tp/(tp+fp)
+            
+            LOGGER.log('Average precision: %.3f' % float(precision * 100))
             
         except KeyboardInterrupt:
             print("Keyboard interrupt")

@@ -89,37 +89,43 @@ class FCN(object):
                 model = tf.contrib.slim.conv2d_transpose(model, 3, (4, 4), stride=2, padding='SAME', activation_fn=None)
 
                 logits = tf.nn.relu(model)
-            
-            # Calculate probabilities and predictions
-            probs = tf.contrib.slim.softmax(logits)
 
-            predictions = {
-                'classes': logits,
-                'probabilities': probs,
-            }
-            
+    
             tf.summary.image("rgb_input", features[0])
             tf.summary.image("depth_input", features[1])
+            tf.summary.image("labels", features[2])
             tf.summary.image("logits", logits)
-            tf.summary.image("labels", labels)
             summaries = tf.summary.merge_all()
 
-            #acc_map, acc_map_update_op = tf.metrics.average_precision_at_k(labels, logits, k=3)
-                     
             # Flatten logits and labels to calculate loss
             logits_flat = tf.reshape(logits, [-1, 3])  
             labels_flat = tf.reshape(labels, [-1])
 
             logits_flat = tf.identity(logits_flat, name='logits_flat_ref')
-            labels_flat = tf.identity(labels_flat, name='labels_flat_ref')
             
             # Transform labels to one-hot encoding
             labels_flat = tf.one_hot(labels_flat, depth=3, dtype=tf.float32)
-            
+            labels_flat = tf.identity(labels_flat, name='labels_flat_ref')       
+                
             loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(logits=logits_flat, labels=labels_flat))
             loss = tf.identity(loss, name='cross_entropy_loss_ref')
 
+            clipped_logits = tf.clip_by_value(logits_flat, 0.0, 0.9999, name='clipped_logits')
             
+            tp, update_tp = tf.metrics.true_positives(
+                labels=labels_flat,
+                predictions=clipped_logits
+            )
+            
+            fp, update_fp = tf.metrics.false_positives(
+                labels=labels_flat,
+                predictions=clipped_logits
+            )
+            
+            precision = tp / (tp + fp)
+                
+            tf.summary.scalar('precision', precision) 
+
             if mode == tf.estimator.ModeKeys.TRAIN:
             
                 train_op = tf.contrib.training.create_train_op(
@@ -127,7 +133,7 @@ class FCN(object):
                     optimizer = tf.train.AdamOptimizer(learning_rate=params['learning_rate_init']),
                     global_step = tf.train.get_or_create_global_step())
 
-                logging_hook = tf.train.LoggingTensorHook({"loss" : loss} , every_n_iter=1)
+                logging_hook = tf.train.LoggingTensorHook({"loss" : loss, "precision": precision} , every_n_iter=10)
                 
                 return tf.estimator.EstimatorSpec(
                     mode=mode,
@@ -136,14 +142,14 @@ class FCN(object):
                     training_hooks = [logging_hook])
     
             elif mode == tf.estimator.ModeKeys.EVAL:
-                
+                                
                 eval_metrics = {}
-                    #"mAP": (acc_map, acc_map_update_op )
-                #}
-   
+                eval_metrics["true_positives"] = tp, update_tp
+                eval_metrics["false_positives"] = fp, update_fp
+                
                 return tf.estimator.EstimatorSpec(
                     mode=mode,
-                    predictions=predictions,
+                    predictions=clipped_logits,
                     loss=loss,
                     eval_metric_ops=eval_metrics
                 )
