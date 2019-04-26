@@ -6,10 +6,6 @@ import os
 
 import horovod.tensorflow as hvd
 
-import itertools
-
-from utils.optimizers import FixedLossScalerOptimizer
-
 from model import resnet_v1
 
 class FCN(object):
@@ -128,9 +124,12 @@ class FCN(object):
 
             if mode == tf.estimator.ModeKeys.TRAIN:
             
+                optimizer = tf.train.AdamOptimizer(learning_rate=params['learning_rate'])
+                optimizer = hvd.DistributedOptimizer(optimizer)
+            
                 train_op = tf.contrib.training.create_train_op(
                     total_loss = loss,
-                    optimizer = tf.train.AdamOptimizer(learning_rate=params['learning_rate_init']),
+                    optimizer = optimizer,
                     global_step = tf.train.get_or_create_global_step())
 
                 logging_hook = tf.train.LoggingTensorHook({"loss" : loss, "precision": precision} , every_n_iter=10)

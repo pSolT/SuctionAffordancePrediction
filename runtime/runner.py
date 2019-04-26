@@ -37,7 +37,16 @@ __all__ = [
 
 class Runner(object):
 
-    def __init__(self, n_classes, height, width, model_dir, log_dir, data_dir, pre_trained_model_path, use_transpose_conv, use_xla=False,  use_tf_amp=False, seed=None ):
+    def __init__(self, 
+                 n_classes, 
+                 model_dir, 
+                 log_dir, 
+                 data_dir, 
+                 pre_trained_model_path, 
+                 use_transpose_conv, 
+                 use_xla=False,  
+                 use_tf_amp=False, 
+                 seed=None ):
 
 
         if data_dir is not None and not os.path.exists(data_dir):
@@ -66,8 +75,6 @@ class Runner(object):
                 LOGGER.log("Using transpose convolutions-based approach")
             
         model_hparams = tf.contrib.training.HParams(
-            width=height,
-            height=width,
             n_classes=n_classes,
             seed=tf_seed,
             use_transpose_conv=use_transpose_conv,
@@ -220,9 +227,7 @@ class Runner(object):
         weight_decay=1e-4,
         learning_rate_init=0.1,
         momentum=0.9,
-        log_every_n_steps=1,
-        loss_scale=256,
-        use_auto_loss_scaling=False,
+        log_every_n_steps=10,
         is_benchmark=False
     ):
 
@@ -233,27 +238,24 @@ class Runner(object):
             raise ValueError('`data_dir` must be specified for training!')
 
         if self.run_hparams.use_tf_amp:
-            if use_auto_loss_scaling:
+            if hvd.rank() == 0:
                 LOGGER.log("TF Loss Auto Scaling is activated - Experimental Feature")
-                os.environ["TF_ENABLE_AUTO_MIXED_PRECISION_LOSS_SCALING"] = "1"
+            os.environ["TF_ENABLE_AUTO_MIXED_PRECISION_LOSS_SCALING"] = "1"
 
-            else:
-                os.environ["TF_ENABLE_AUTO_MIXED_PRECISION_LOSS_SCALING"] = "0"
 
         num_gpus = hvd.size()
         global_batch_size = batch_size * num_gpus
         num_samples = data_utils.get_num_images(self.run_hparams.data_dir, mode="train")
+        scaled_learning_rate = learning_rate_init * global_batch_size 
         
         if iter_unit == 'epoch':
             num_steps = (num_samples // global_batch_size) * num_iter
             num_epochs = num_iter
-            num_decay_steps = num_steps
             steps_per_epoch = num_steps / num_epochs
 
         else:
             num_steps = num_iter
             num_epochs = math.ceil(num_steps / (num_samples // global_batch_size))
-            num_decay_steps = 90 * num_samples // global_batch_size
             steps_per_epoch = num_steps
         
         training_hooks = []
@@ -263,16 +265,15 @@ class Runner(object):
             LOGGER.log("Training Epochs", num_epochs)
             LOGGER.log("Total Steps", num_steps)
             LOGGER.log("Steps per Epoch", steps_per_epoch)
-            LOGGER.log("Decay Steps", num_decay_steps)
-            LOGGER.log("Weight Decay Factor", weight_decay)
             LOGGER.log("Init Learning Rate", learning_rate_init)
+            LOGGER.log("Scaled Learning Rate", scaled_learning_rate)
             LOGGER.log("Momentum", momentum)
             LOGGER.log("Num GPUs", num_gpus)
             LOGGER.log("Per-GPU Batch Size", batch_size)
 
             training_logging_hook = hooks.TrainingLoggingHook(
                 global_batch_size=global_batch_size,
-                log_every=1
+                log_every=log_every_n_steps
             )
 
             training_hooks.append(training_logging_hook)
@@ -280,14 +281,13 @@ class Runner(object):
             
         bcast_hook = hvd.BroadcastGlobalVariablesHook(0)
         training_hooks.append(bcast_hook)
-
       
         estimator_params = {
             'batch_size': batch_size,
             'num_gpus': num_gpus,
             'momentum': momentum,
-            'learning_rate_init': learning_rate_init,
-            'log_dir' : self.run_hparams.log_dir
+            'learning_rate': scaled_learning_rate,
+            'log_dir' : self.run_hparams.log_dir,
         }
 
         image_classifier = self._get_estimator(
@@ -310,8 +310,10 @@ class Runner(object):
                 steps=num_steps,
                 hooks=training_hooks,
             )
-        except KeyboardInterrupt:
+        
+        except KeyboardInterrupt as e:
             print("Keyboard interrupt")
+
             
         if hvd.rank() == 0:
             LOGGER.log('Ending Model Training ...')
@@ -344,12 +346,10 @@ class Runner(object):
         if iter_unit == 'epoch':
             num_steps = (num_images // batch_size) * num_iter
             num_epochs = num_iter
-            num_decay_steps = num_steps
 
         else:
             num_steps = num_iter
             num_epochs = math.ceil(num_steps / (num_images // batch_size))
-            num_decay_steps = 90 * num_images // batch_size
         
         eval_hooks = []
         
@@ -367,7 +367,6 @@ class Runner(object):
             LOGGER.log('Starting Model Evaluation...')
             LOGGER.log("Evaluation Epochs", num_epochs)
             LOGGER.log("Evaluation Steps", num_steps)
-            LOGGER.log("Decay Steps", num_decay_steps)
             LOGGER.log("Global Batch Size", batch_size)
 
             
@@ -387,14 +386,15 @@ class Runner(object):
             )
             
             print(eval_results)
-            
-            tp = np.mean(eval_results['true_positives'])
-            fp = np.mean(eval_results['false_positives'])
+            tp = eval_results['true_positives']
+            fp = eval_results['false_positives']
             precision = tp/(tp+fp)
+
+            print('Average precision: ', (precision * 100))
+
             
-            LOGGER.log('Average precision: %.3f' % float(precision * 100))
-            
-        except KeyboardInterrupt:
+        except KeyboardInterrupt as e:
             print("Keyboard interrupt")
+
 
         LOGGER.log('Ending Model Evaluation ...')

@@ -38,22 +38,6 @@ def parse_cmdline():
         type=str,
         help="Path to dataset."
     )
-    
-    p.add_argument(
-        '--image_height', 
-        type=int, 
-        default=480,
-        required=False, 
-        help="""Height of an dataset image"""
-    )
-    
-    p.add_argument(
-        '--image_width', 
-        type=int, 
-        default=640,
-        required=False,  
-        help="""Width of an dataset image"""
-    )
 
     p.add_argument(
         '--batch_size', 
@@ -88,7 +72,7 @@ def parse_cmdline():
     
     p.add_argument(
         '--eval_every',
-        default=1,
+        default=0,
         type=int,
         required=False,
         help="""Eval every n iterations"""
@@ -152,13 +136,6 @@ def parse_cmdline():
         action='store_true',
         required=False,
         help="Enable Automatic Mixed Precision to speedup FP32 computation using tensor cores."
-    )
-    
-    p.add_argument(
-        "--use_auto_loss_scaling",
-        action='store_true',
-        required=False,
-        help="Use AutoLossScaling in TF AMP mode."
     )
     
     p.add_argument(

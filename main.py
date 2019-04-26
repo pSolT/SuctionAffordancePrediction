@@ -39,8 +39,6 @@ if __name__ == "__main__":
     runner = Runner(
         # ========= Model HParams ========= #
         n_classes=_NUM_CLASSES,
-        height=FLAGS.image_height,
-        width=FLAGS.image_width,
         
         log_dir=FLAGS.results_dir,
         model_dir=FLAGS.results_dir,
@@ -55,8 +53,8 @@ if __name__ == "__main__":
         seed=FLAGS.seed
     )
     
-    if FLAGS.mode == "train_and_evaluate":
-    
+    if FLAGS.mode == "train_and_evaluate" and FLAGS.eval_every > 0:
+
         for i in range(int(FLAGS.num_iter / FLAGS.eval_every)):
             
             runner.train(
@@ -67,13 +65,12 @@ if __name__ == "__main__":
                 weight_decay=FLAGS.weight_decay,
                 learning_rate_init=FLAGS.lr_init,
                 momentum=FLAGS.momentum,
-                use_auto_loss_scaling=FLAGS.use_auto_loss_scaling,
                 is_benchmark=FLAGS.mode == 'training_benchmark'
             )
                 
             runner.evaluate(
-                iter_unit=FLAGS.iter_unit if FLAGS.mode != "train_and_evaluate" else "epoch",
-                num_iter=FLAGS.num_iter if FLAGS.mode != "train_and_evaluate" else 1,
+                iter_unit= "epoch",
+                num_iter= 1,
                 warmup_steps=FLAGS.warmup_steps,
                 batch_size=FLAGS.batch_size,
                 is_benchmark=FLAGS.mode == 'inference_benchmark'
@@ -82,16 +79,14 @@ if __name__ == "__main__":
     else:  
 
         if FLAGS.mode in ["train", "train_and_evaluate", "training_benchmark"]:
-
             runner.train(
                 iter_unit=FLAGS.iter_unit,
-                num_iter=FLAGS.num_iter / FLAGS.eval_every,
+                num_iter=FLAGS.num_iter,
                 batch_size=FLAGS.batch_size,
                 warmup_steps=FLAGS.warmup_steps,
                 weight_decay=FLAGS.weight_decay,
                 learning_rate_init=FLAGS.lr_init,
                 momentum=FLAGS.momentum,
-                use_auto_loss_scaling=FLAGS.use_auto_loss_scaling,
                 is_benchmark=FLAGS.mode == 'training_benchmark',
             )
 
