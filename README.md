@@ -20,7 +20,7 @@ bash prepare.sh
 Pre-trained model checkpoint and dataset will be downloaded to directories `pre_trained_model` and `data` respectively.
 
 
-## 2. Run the content of this directory inside TensorFlow 19.04-py3 NGC container
+## 2. Run the content of repository's root directory inside TensorFlow 19.04-py3 NGC container
 
 ```bash
 nvidia-docker run -it --rm     --shm-size=2g --ulimit memlock=-1 --ulimit stack=67108864  -v `pwd`:/work   nvcr.io/nvidia/tensorflow:19.04-py3
